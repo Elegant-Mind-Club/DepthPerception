@@ -99,16 +99,17 @@ def convolute(img1, img2, kernel_size):
 
 def find_best_match(image1, image2, kernel_size):
     """Find best MSE match for each kernel position in image1 by sliding a kernel in image2."""
-    height, width = image1.shape
+    height, width = image1.shape[:2]
     match_map = np.zeros((height - kernel_size + 1, width - kernel_size + 1))
     match_locations = []
 
     for y in range(0, height - kernel_size + 1, KERNEL_SIZE):
+
         for x1 in range(0, width - kernel_size + 1):
             # print(y, x1, "\n")
             patch1 = image1[y:y + kernel_size, x1:x1 + kernel_size]
             best_mse = float('inf')  # Initialize with a high value for MSE
-            best_mse_x2 = 0
+            best_mse_x2 = 0 # x value (where kernel begins) of best match in img2
 
             # Only slide kernel if there is an edge in img1
             if np.mean(patch1) != 0:
@@ -121,7 +122,7 @@ def find_best_match(image1, image2, kernel_size):
                         best_mse = current_mse
                         best_mse_x2 = x2
 
-                # Store the best MSE value for this position of the kernel in image1
+                # for patch in img1, store the best MSE value
                 match_map[y, x1] = best_mse
 
                 # If MSE is zero (or very close to zero), store the location
@@ -130,9 +131,29 @@ def find_best_match(image1, image2, kernel_size):
 
     # print position map
     np.set_printoptions(threshold=np.inf)
-    print("Match locations: ", match_locations)
+    print("First 20 Match locations: ", match_locations[:20])
     match_locations.sort()
     # print(match_locations)
+
+
+    # Different way of generating position image, with color
+
+    visualization = np.ones((height, width*2, 3), dtype=np.uint8) * 255
+
+    visualization[:, :width, 0] = image1
+    visualization[:, width:, 0] = image2
+
+    for (y, x1, x2) in match_locations:
+
+        # draw line in different colors
+        color = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
+        cv2.line(visualization, (x1, y), (x2+width, y), color, 1)
+
+        # cv2.putText(visualization, f"{y}", (x1, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
+        # cv2.putText(visualization, f"{y}", (x2+width, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
+
+
+
 
     # Generate position image. Initialize an all-black image
     position_image = np.ones((height, width), dtype=np.uint8) * 255
@@ -148,18 +169,41 @@ def find_best_match(image1, image2, kernel_size):
         cv2.line(position_image, (x1, y), (x2, y), (0, 0, 255), 1)
 
     cv2.imshow("Position image", position_image)
-    cv2.waitKey(0)
+    # cv2.imshow("Visualization", visualization)
+    # cv2.waitKey(0)
 
     return match_map
 
+# alpha: transparency value for blending for img 1
 def superimpose(img1, img2, alpha):
-    # alpha: transparency value for blending for alpha 1
+    # make sure both are of the same datatype
+    img1 = img1.astype(np.uint8)
+    img2 = img2.astype(np.uint8)
+
+    assert img1.dtype == img2.dtype
+    print(img1.dtype)
+    print(img2.dtype)
 
     # shape[1]: width, shape[0]: height
     img2_resized = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
     blended = cv2.addWeighted(img1, alpha, img2_resized, 1-alpha, 0)
 
     return blended
+
+
+def addColor(img, color):
+    # need to convert it to float32
+    img = np.float32(img)
+
+    # creating a mask for white regions (simpler than color extraction)
+    _, mask = cv2.threshold(img, 200, 255, cv2.THRESH_BINARY)
+
+    # convert image to BGR
+    colored = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    colored[mask>0] = color
+
+    return colored
 
 
 def main():
@@ -179,7 +223,8 @@ def main():
     b1, b2 = extractColors(img1, img2, 'blue')
 
     # cv2.namedWindow(f"Extracted red", cv2.WINDOW_NORMAL)
-    # cv2.imshow(f"Extracted red", np.concatenate((r1, r2), axis=1))
+    cv2.imshow(f"Extracted red", np.concatenate((r1, r2), axis=1))
+    # cv2.imshow(f"Extracted blue", np.concatenate((b1, b2), axis=1))
 
 
     # Standard
@@ -200,9 +245,18 @@ def main():
     cv2.imshow("Red Edges Superimposed", blended_r)
 
 
-    match_map = convolute(edge1, edge2, KERNEL_SIZE)
-    cv2.imshow('Match Map', match_map)
-    # # print(match_map)
+    # match_map = convolute(edge1, edge2, KERNEL_SIZE)
+    # cv2.imshow('Match Map', match_map)
+    # # # print(match_map)
+
+    # # Adding color to the match_map
+    # colored_match_map = addColor(match_map, (0, 0, 255))
+    # cv2.imshow("Colored Match map", colored_match_map)
+
+
+    # # blended_edge_match = superimpose(edge1, colored_match_map, 0.3)
+    # # cv2.imshow("Img with match Superimposed", blended_edge_match)
+
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
