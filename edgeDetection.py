@@ -5,21 +5,26 @@ from skimage.metrics import structural_similarity as ssim
 
 
 # Constants
-IMG1_PATH = 'left.JPG'
+IMG1_PATH = '/Users/alex/Desktop/UCLA school work/Research/Elegant mind/Depth perception/images/20cm copy.jpg'
 
-IMG2_PATH = 'right.JPG'
+IMG2_PATH = '/Users/alex/Desktop/UCLA school work/Research/Elegant mind/Depth perception/images/10cm copy.jpg'
 
-IMG_CROP_START_X = 1250
-IMG_CROP_START_Y = 1650
-IMG_CROP_WIDTH = 800
-IMG_CROP_HEIGHT = 450
+# IMG_CROP_START_X = 1250
+# IMG_CROP_START_Y = 1650
+# IMG_CROP_WIDTH = 800
+# IMG_CROP_HEIGHT = 450
 
 # IMG_CROP_START_X = 1300
 # IMG_CROP_START_Y = 1700
 # IMG_CROP_WIDTH = 300
 # IMG_CROP_HEIGHT = 200
 
-KERNEL_SIZE = 2
+IMG_CROP_START_X = 0
+IMG_CROP_START_Y = 0
+IMG_CROP_WIDTH = 10000
+IMG_CROP_HEIGHT = 10000
+
+KERNEL_SIZE = 5
 
 
 def mse(patch1, patch2):
@@ -51,28 +56,29 @@ def visualCortexV2V3(img):
     return edges
 
 
-def visualCortexV4(img1, img2):
+def visualCortexV4(img1Edges, img2Edges, img1):
     # Depth
-    return find_best_match(img1, img2, KERNEL_SIZE)
+    return find_best_match(img1Edges, img2Edges, KERNEL_SIZE, img1)
 
 
-def find_best_match(image1, image2, kernel_size):
+def find_best_match(image1Edges, image2Edges, kernel_size, image1):
     """Find best MSE match for each kernel position in image1 by sliding a kernel in image2."""
-    height, width = image1.shape
+    height, width = image1Edges.shape
     match_map = np.zeros((height - kernel_size + 1, width - kernel_size + 1))
     match_locations = []
 
     for y in range(0, height - kernel_size + 1, KERNEL_SIZE):
         for x1 in range(0, width - kernel_size + 1):
             # print(y, x1, "\n")
-            patch1 = image1[y:y + kernel_size, x1:x1 + kernel_size]
+            patch1 = image1Edges[y:y + kernel_size, x1:x1 + kernel_size]
             best_mse = float('inf')  # Initialize with a high value for MSE
             best_mse_x2 = 0
 
             # Only slide kernel if there is an edge
             if np.mean(patch1) != 0:
                 for x2 in range(x1, width - kernel_size + 1):
-                    patch2 = image2[y:y + kernel_size, x2:x2 + kernel_size]
+                    patch2 = image2Edges[y:y +
+                                         kernel_size, x2:x2 + kernel_size]
                     current_mse = mse(patch1, patch2)
 
                     # Update the best MSE value if the current one is better
@@ -104,8 +110,10 @@ def find_best_match(image1, image2, kernel_size):
 
         # Draw a line between (y, x1) and (y, x2)
         cv2.line(position_image, (x1, y), (x2, y), (0, 0, 255), 1)
+        cv2.line(image1, (x1, y), (x2, y), (0, 0, 255), 1)
 
     cv2.imshow("Position image", position_image)
+    cv2.imshow("Image with lines", image1)
     cv2.waitKey(0)
 
     return match_map
@@ -132,7 +140,7 @@ def main():
     cv2.imshow('Canny Edge Detection', imagesEdges)
     cv2.waitKey(0)
 
-    match_map = visualCortexV4(img1Edges, img2Edges)
+    match_map = visualCortexV4(img1Edges, img2Edges, img1)
     cv2.imshow('Match Map', match_map)
     # print(match_map)
     cv2.waitKey(0)
