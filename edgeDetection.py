@@ -9,6 +9,8 @@ IMG1_PATH = '/Users/alex/Desktop/UCLA school work/Research/Elegant mind/Depth pe
 
 IMG2_PATH = '/Users/alex/Desktop/UCLA school work/Research/Elegant mind/Depth perception/images/10cm copy.jpg'
 
+print(124)
+
 # IMG_CROP_START_X = 1250
 # IMG_CROP_START_Y = 1650
 # IMG_CROP_WIDTH = 800
