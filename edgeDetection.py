@@ -8,14 +8,25 @@ from skimage.metrics import structural_similarity as ssim
 IMG1_PATH = 'left.JPG'
 IMG2_PATH = 'right.JPG'
 
-IMG_CROP_START_X = 1250
-IMG_CROP_START_Y = 1650
-IMG_CROP_WIDTH = 800
-IMG_CROP_HEIGHT = 450
+# IMG_CROP_START_X = 1250
+# IMG_CROP_START_Y = 1650
+# IMG_CROP_WIDTH = 800
+# IMG_CROP_HEIGHT = 450
 
 # best practice is 1,3,5,7
 KERNEL_SIZE = 3
 TOLERANCE = 1e-5
+# IMG_CROP_START_X = 1300
+# IMG_CROP_START_Y = 1700
+# IMG_CROP_WIDTH = 300
+# IMG_CROP_HEIGHT = 200
+
+IMG_CROP_START_X = 0
+IMG_CROP_START_Y = 0
+IMG_CROP_WIDTH = 10000
+IMG_CROP_HEIGHT = 10000
+
+KERNEL_SIZE = 5
 
 
 def mse(patch1, patch2):
@@ -97,7 +108,7 @@ def convolute(img1, img2, kernel_size):
     return find_best_match(img1, img2, kernel_size)
 
 
-def find_best_match(image1, image2, kernel_size):
+def find_best_match(image1Edges, image2Edges, kernel_size, image1):
     """Find best MSE match for each kernel position in image1 by sliding a kernel in image2."""
     height, width = image1.shape[:2]
     match_map = np.zeros((height - kernel_size + 1, width - kernel_size + 1))
@@ -107,14 +118,15 @@ def find_best_match(image1, image2, kernel_size):
 
         for x1 in range(0, width - kernel_size + 1):
             # print(y, x1, "\n")
-            patch1 = image1[y:y + kernel_size, x1:x1 + kernel_size]
+            patch1 = image1Edges[y:y + kernel_size, x1:x1 + kernel_size]
             best_mse = float('inf')  # Initialize with a high value for MSE
             best_mse_x2 = 0 # x value (where kernel begins) of best match in img2
 
             # Only slide kernel if there is an edge in img1
             if np.mean(patch1) != 0:
                 for x2 in range(x1, width - kernel_size + 1):
-                    patch2 = image2[y:y + kernel_size, x2:x2 + kernel_size]
+                    patch2 = image2Edges[y:y +
+                                         kernel_size, x2:x2 + kernel_size]
                     current_mse = mse(patch1, patch2)
 
                     # Update the best MSE value if the current one is better
@@ -167,10 +179,13 @@ def find_best_match(image1, image2, kernel_size):
 
         # Draw a line between (y, x1) and (y, x2)
         cv2.line(position_image, (x1, y), (x2, y), (0, 0, 255), 1)
+        cv2.line(image1, (x1, y), (x2, y), (0, 0, 255), 1)
 
     cv2.imshow("Position image", position_image)
     # cv2.imshow("Visualization", visualization)
     # cv2.waitKey(0)
+    cv2.imshow("Image with lines", image1)
+    cv2.waitKey(0)
 
     return match_map
 
