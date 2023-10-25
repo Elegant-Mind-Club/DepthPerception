@@ -3,21 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.metrics import structural_similarity as ssim
 
-
 # Constants
-IMG1_PATH = 'left.JPG'
-IMG2_PATH = 'right.JPG'
+IMG1_PATH = 'IMG_7210.JPG'
 
-print(124)
+IMG2_PATH = 'IMG_7212.JPG'
 
-# IMG_CROP_START_X = 1250
-# IMG_CROP_START_Y = 1650
-# IMG_CROP_WIDTH = 800
-# IMG_CROP_HEIGHT = 450
+# IMG_CROP_START_X = 1300
+# IMG_CROP_START_Y = 1500
+# IMG_CROP_WIDTH = 1200
+# IMG_CROP_HEIGHT = 600
 
-# best practice is 1,3,5,7
-KERNEL_SIZE = 3
-TOLERANCE = 1e-5
 # IMG_CROP_START_X = 1300
 # IMG_CROP_START_Y = 1700
 # IMG_CROP_WIDTH = 300
@@ -28,8 +23,9 @@ IMG_CROP_START_Y = 0
 IMG_CROP_WIDTH = 10000
 IMG_CROP_HEIGHT = 10000
 
-KERNEL_SIZE = 5
-
+KERNEL_SIZE = 7
+TOLERANCE = 1e-5
+MAXIMUM_DISPLACEMENT = cv2.imread(IMG1_PATH).shape[1] / 3
 
 def mse(patch1, patch2):
     """Compute the Mean Squared Error between two image patches."""
@@ -40,10 +36,10 @@ def mse(patch1, patch2):
 
 def initilizeImage(imgPath, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight):
     # Return cropped image
-    return cv2.imread(imgPath)[imgCropStartY:imgCropStartY+imgCropHeight, imgCropStartX:imgCropStartX+imgCropWidth]
+    img = cv2.imread(imgPath)[imgCropStartY:imgCropStartY+imgCropHeight, imgCropStartX:imgCropStartX+imgCropWidth]
+    return img
 
-
-def extractColors(img1, img2, color):
+# def extractColors(img1, img2, color):
 
     #convert the BGR image to HSV colour space
     hsv1 = cv2.cvtColor(img1, cv2.COLOR_BGR2HSV)
@@ -87,10 +83,10 @@ def extractColors(img1, img2, color):
 
     return result1, result2
 
-# Color
-def visualCortexV1():
-    pass
 
+def visualCortexV1():
+    # Color
+    pass
 
 # Curves and lines
 def detectEdges(img):
@@ -104,94 +100,24 @@ def detectEdges(img):
     edges = cv2.Canny(image=img_blur, threshold1=100, threshold2=200)
     return edges
 
+def visualCortexV2V3(img):
+    # Curves and lines
+    # Convert to graycsale
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Blur the image for better edge detection
+    img_blur = cv2.GaussianBlur(img_gray, (3, 3), 0)
+    # Canny Edge Detection
+    edges = cv2.Canny(image=img_blur, threshold1=100, threshold2=200)
+    return edges
 
-def convolute(img1, img2, kernel_size):
+
+def convolute(img1, img2, kernel_size, originalImage):
     # Depth
-    return find_best_match(img1, img2, kernel_size)
-
-
-def find_best_match(image1Edges, image2Edges, kernel_size, image1):
-    """Find best MSE match for each kernel position in image1 by sliding a kernel in image2."""
-    height, width = image1.shape[:2]
-    match_map = np.zeros((height - kernel_size + 1, width - kernel_size + 1))
-    match_locations = []
-
-    for y in range(0, height - kernel_size + 1, KERNEL_SIZE):
-
-        for x1 in range(0, width - kernel_size + 1):
-            # print(y, x1, "\n")
-            patch1 = image1Edges[y:y + kernel_size, x1:x1 + kernel_size]
-            best_mse = float('inf')  # Initialize with a high value for MSE
-            best_mse_x2 = 0 # x value (where kernel begins) of best match in img2
-
-            # Only slide kernel if there is an edge in img1
-            if np.mean(patch1) != 0:
-                for x2 in range(x1, width - kernel_size + 1):
-                    patch2 = image2Edges[y:y +
-                                         kernel_size, x2:x2 + kernel_size]
-                    current_mse = mse(patch1, patch2)
-
-                    # Update the best MSE value if the current one is better
-                    if current_mse < best_mse:
-                        best_mse = current_mse
-                        best_mse_x2 = x2
-
-                # for patch in img1, store the best MSE value
-                match_map[y, x1] = best_mse
-
-                # If MSE is zero (or very close to zero), store the location
-                if np.isclose(best_mse, 0, atol=TOLERANCE):
-                    match_locations.append((y, x1, best_mse_x2))
-
-    # print position map
-    np.set_printoptions(threshold=np.inf)
-    print("First 20 Match locations: ", match_locations[:20])
-    match_locations.sort()
-    # print(match_locations)
-
-
-    # Different way of generating position image, with color
-
-    visualization = np.ones((height, width*2, 3), dtype=np.uint8) * 255
-
-    visualization[:, :width, 0] = image1
-    visualization[:, width:, 0] = image2
-
-    for (y, x1, x2) in match_locations:
-
-        # draw line in different colors
-        color = (np.random.randint(0, 256), np.random.randint(0, 256), np.random.randint(0, 256))
-        cv2.line(visualization, (x1, y), (x2+width, y), color, 1)
-
-        # cv2.putText(visualization, f"{y}", (x1, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
-        # cv2.putText(visualization, f"{y}", (x2+width, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
-
-
-
-
-    # Generate position image. Initialize an all-black image
-    position_image = np.ones((height, width), dtype=np.uint8) * 255
-    prev = -1
-    for (y, x1, x2) in match_locations:
-        if y == prev:
-            continue
-        prev = y
-        position_image[y, x2] = 0  # Set (y, x2) to white
-        position_image[y, x1] = 0  # Set (y, x1) to white
-
-        # Draw a line between (y, x1) and (y, x2)
-        cv2.line(position_image, (x1, y), (x2, y), (0, 0, 255), 1)
-        cv2.line(image1, (x1, y), (x2, y), (0, 0, 255), 1)
-
-    cv2.imshow("Position image", position_image)
-    # cv2.imshow("Visualization", visualization)
-    # cv2.waitKey(0)
-    cv2.imshow("Image with lines", image1)
-    cv2.waitKey(0)
-
-    return match_map
+    return find_best_match(img1, img2, kernel_size, originalImage)
 
 # alpha: transparency value for blending for img 1
+
+
 def superimpose(img1, img2, alpha):
     # make sure both are of the same datatype
     img1 = img1.astype(np.uint8)
@@ -208,6 +134,63 @@ def superimpose(img1, img2, alpha):
     return blended
 
 
+def find_best_match(image1Edges, image2Edges, kernel_size, image1):
+    """Find best MSE match for each kernel position in image1 by sliding a kernel in image2."""
+    height, width = image1Edges.shape
+    match_map = np.zeros((height - kernel_size + 1, width - kernel_size + 1))
+    match_locations = []
+
+    for y in range(0, height - kernel_size + 1, 3):
+        for x1 in range(0, width - kernel_size + 1):
+            # print(y, x1, "\n")
+            patch1 = image1Edges[y:y + kernel_size, x1:x1 + kernel_size]
+            best_mse = float('inf')  # Initialize with a high value for MSE
+            best_mse_x2 = 0
+
+            # Only slide kernel if there is an edge
+            if np.mean(patch1) != 0:
+                for x2 in range(x1, width - kernel_size + 1):
+                    patch2 = image2Edges[y:y +
+                                         kernel_size, x2:x2 + kernel_size]
+                    current_mse = mse(patch1, patch2)
+
+                    # Update the best MSE value if the current one is better
+                    if current_mse < best_mse:
+                        best_mse = current_mse
+                        best_mse_x2 = x2
+
+                # Store the best MSE value for this position of the kernel in image1
+                match_map[y, x1] = best_mse
+
+                # If MSE is zero (or very close to zero), store the location
+                if np.isclose(best_mse, 0, atol=1e-10) and best_mse_x2 - x1 < MAXIMUM_DISPLACEMENT:
+                    match_locations.append((y, x1, best_mse_x2))
+
+    # print position map
+    np.set_printoptions(threshold=np.inf)
+    match_locations.sort()
+    # print(match_locations)
+
+    # Generate position image. Initialize an all-black image
+    position_image = np.ones((height, width), dtype=np.uint8) * 255
+    # prev = -1
+    for (y, x1, x2) in match_locations:
+        # if y == prev:
+        #     continue
+        # prev = y
+        position_image[y, x2] = 0  # Set (y, x2) to white
+        position_image[y, x1] = 0  # Set (y, x1) to white
+
+        # Draw a line between (y, x1) and (y, x2)
+        cv2.line(position_image, (x1, y), (x2, y), (0, 0, 255), 1)
+        cv2.line(image1, (x1, y), (x2, y), (0, 0, 255), 1)
+
+    cv2.imshow("Position image", position_image)
+    cv2.imshow("Image with lines", image1)
+    cv2.waitKey(0)
+
+    return match_map
+
 def addColor(img, color):
     # need to convert it to float32
     img = np.float32(img)
@@ -222,61 +205,35 @@ def addColor(img, color):
 
     return colored
 
-
 def main():
-
     img1 = initilizeImage(IMG1_PATH, IMG_CROP_START_X,
                           IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
     img2 = initilizeImage(IMG2_PATH, IMG_CROP_START_X,
                           IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
-    
-    # Initial Images
+    # Images before
     imagesBefore = np.concatenate((img1, img2), axis=1)
+    cv2.namedWindow('Resized Image', cv2.WINDOW_NORMAL)
     cv2.imshow("Initial images", imagesBefore)
-    # cv2.waitKey(0)
-
-    r1, r2 = extractColors(img1, img2, 'red')
-    g1, g2 = extractColors(img1, img2, 'green')
-    b1, b2 = extractColors(img1, img2, 'blue')
-
-    # cv2.namedWindow(f"Extracted red", cv2.WINDOW_NORMAL)
-    cv2.imshow(f"Extracted red", np.concatenate((r1, r2), axis=1))
-    # cv2.imshow(f"Extracted blue", np.concatenate((b1, b2), axis=1))
-
-
-    # Standard
-    edge1 = detectEdges(img1)
-    edge2 = detectEdges(img2)
-    # cv2.imshow('Canny Edge Detection', np.concatenate((edge1, edge2), axis=1))
-
-    # Color
-    edge1_r = detectEdges(r1)
-    edge2_r = detectEdges(r2)
-    # cv2.imshow('Canny Edge Detection w color', np.concatenate((edge1_r, edge2_r), axis=1))
     cv2.waitKey(0)
 
-    blended_initial = superimpose(edge1, edge2, 0.3)
-    cv2.imshow("Edges Superimposed", blended_initial)
+    # Brain process
+    visualCortexV1()
+    img1Edges = visualCortexV2V3(img1)
+    img2Edges = visualCortexV2V3(img2)
+    imagesEdges = np.concatenate((img1Edges, img2Edges), axis=1)
+    cv2.namedWindow('Resized Image', cv2.WINDOW_NORMAL)
+    cv2.imshow('Canny Edge Detection', imagesEdges)
+    cv2.waitKey(0)
 
-    blended_r = superimpose(edge1_r, edge2_r, 0.3)
-    cv2.imshow("Red Edges Superimposed", blended_r)
+    blended_initial = superimpose(img1, img2, 0.3)
+    cv2.imshow("Superimposed images", blended_initial)
+    cv2.waitKey(0)
 
-
-    # match_map = convolute(edge1, edge2, KERNEL_SIZE)
-    # cv2.imshow('Match Map', match_map)
-    # # # print(match_map)
-
-    # # Adding color to the match_map
-    # colored_match_map = addColor(match_map, (0, 0, 255))
-    # cv2.imshow("Colored Match map", colored_match_map)
-
-
-    # # blended_edge_match = superimpose(edge1, colored_match_map, 0.3)
-    # # cv2.imshow("Img with match Superimposed", blended_edge_match)
-
+    match_map = convolute(img1Edges, img2Edges, KERNEL_SIZE, blended_initial)
+    cv2.imshow('Match Map', match_map)
+    # print(match_map)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     main()
