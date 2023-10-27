@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 from skimage.metrics import structural_similarity as ssim
 
 # Constants
-IMG1_PATH = 'IMG_7210.JPG'
+IMG1_PATH = '10cm.jpg'
 
-IMG2_PATH = 'IMG_7212.JPG'
+IMG2_PATH = '20cm.jpg'
 
 # IMG_CROP_START_X = 1300
 # IMG_CROP_START_Y = 1500
@@ -91,10 +91,13 @@ def visualCortexV1():
 # Curves and lines
 def detectEdges(img):
     # Convert to graycsale
-    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # Blur the image for better edge detection
-    img_blur = cv2.GaussianBlur(img_gray, (5,5), 0)
+    # img_blur = cv2.GaussianBlur(img_gray, (5,5), 0)
     # Canny Edge Detection. 
+
+    img_blur = cv2.GaussianBlur(img, (5,5), 0)
+
     # 5 step process: image smoothening -> finding intensity gradients -> 
     # non-max suppression -> double threshold -> hysteresis edge tracking
     edges = cv2.Canny(image=img_blur, threshold1=100, threshold2=200)
