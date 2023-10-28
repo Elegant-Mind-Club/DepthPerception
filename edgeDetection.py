@@ -2,11 +2,18 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.metrics import structural_similarity as ssim
+import os
 
 # Constants
-IMG1_PATH = '10cm.jpg'
+IMG1_PATH = '10cmDownscaled.jpg'
 
-IMG2_PATH = '20cm.jpg'
+IMG2_PATH = '20cmDownscaled.jpg'
+
+VIDEO_PATH = 'video/testVideo.MOV'
+
+IMAGES_FROM_VIDEO_PATH = 'imagesFromVideo'
+
+IMAGE_SCALE_DOWN_FACTOR = 0.3
 
 # IMG_CROP_START_X = 1300
 # IMG_CROP_START_Y = 1500
@@ -26,6 +33,59 @@ IMG_CROP_HEIGHT = 10000
 KERNEL_SIZE = 7
 TOLERANCE = 1e-5
 MAXIMUM_DISPLACEMENT = cv2.imread(IMG1_PATH).shape[1] / 3
+
+def resize_image(image, scaleFactor):
+    """
+    Resize the given image by the specified percentage.
+    :param image: Input image.
+    :param scale_percent: Percentage by which the image should be resized.
+    :return: Resized image.
+    """
+    width = int(image.shape[1] * scaleFactor)
+    height = int(image.shape[0] * scaleFactor)
+    dim = (width, height)
+    return cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+
+def extract_frames(video_path, timeframes, output_folder):
+    """ Get images from video"""
+    # Open the video using OpenCV
+    cap = cv2.VideoCapture(video_path)
+
+    # Check if the video opened successfully
+    if not cap.isOpened():
+        print("Error: Couldn't open the video.")
+        return
+
+    # Get the frames per second of the video
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+    newImagesFilePathArray = []
+
+    for time in timeframes:
+        # Calculate the frame number. Time is given in seconds
+        frame_no = int(time * fps)
+
+        # Set the video position to the frame we want to capture
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)
+
+        # Read the frame
+        ret, frame = cap.read()
+
+        # If the frame was successfully read, save it
+        if ret:
+            # Downscale the image
+            scaled_frame = resize_image(frame, IMAGE_SCALE_DOWN_FACTOR)  # reduce size
+
+            output_path = f"{output_folder}/{time}_seconds.jpg"
+            newImagesFilePathArray.append(output_path)
+            cv2.imwrite(output_path, scaled_frame)
+        else:
+            print(f"Error: Couldn't extract frame at {time} seconds.")
+
+    # Release the video capture object
+    cap.release()
+    return newImagesFilePathArray
+    
 
 def mse(patch1, patch2):
     """Compute the Mean Squared Error between two image patches."""
@@ -208,11 +268,10 @@ def addColor(img, color):
 
     return colored
 
-def main():
-    img1 = initilizeImage(IMG1_PATH, IMG_CROP_START_X,
-                          IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
-    img2 = initilizeImage(IMG2_PATH, IMG_CROP_START_X,
-                          IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
+def generateDepthFromTwoImages(img1Path, img2Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight):
+    # Swap images 1 and 2 for visualization purposes
+    img1 = initilizeImage(img2Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight)
+    img2 = initilizeImage(img1Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight)
     # Images before
     imagesBefore = np.concatenate((img1, img2), axis=1)
     cv2.namedWindow('Resized Image', cv2.WINDOW_NORMAL)
@@ -237,6 +296,19 @@ def main():
     # print(match_map)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+def generateDepthFromVideo():
+    ''' Using the video from the video folder, calculate depth'''
+    # These are the timeframes for testVideo.mov in seconds
+    timeframes = [1, 10, 17, 23, 30, 40, 47, 51, 61, 70, 76]
+    # Get the frames from the video and store them in imagesFromVideo folder locally
+    newImagesFilePathArray = extract_frames(VIDEO_PATH, timeframes, IMAGES_FROM_VIDEO_PATH)
+    generateDepthFromTwoImages(newImagesFilePathArray[0], newImagesFilePathArray[1], IMG_CROP_START_X,
+                               IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
+
+def main():
+    # generateDepthFromTwoImages(IMG1_PATH, IMG2_PATH, IMG_CROP_START_X, IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
+    generateDepthFromVideo()
 
 if __name__ == "__main__":
     main()
