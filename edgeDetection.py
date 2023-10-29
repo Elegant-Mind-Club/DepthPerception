@@ -187,8 +187,6 @@ def superimpose(img1, img2, alpha):
     img2 = img2.astype(np.uint8)
 
     assert img1.dtype == img2.dtype
-    print(img1.dtype)
-    print(img2.dtype)
 
     # shape[1]: width, shape[0]: height
     img2_resized = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
@@ -197,7 +195,7 @@ def superimpose(img1, img2, alpha):
     return blended
 
 
-def find_best_match(image1Edges, image2Edges, kernel_size, image1):
+def find_best_match(image1Edges, image2Edges, kernel_size, image1, mode="simple"):
     """Find best MSE match for each kernel position in image1 by sliding a kernel in image2."""
     height, width = image1Edges.shape
     match_map = np.zeros((height - kernel_size + 1, width - kernel_size + 1))
@@ -247,12 +245,10 @@ def find_best_match(image1Edges, image2Edges, kernel_size, image1):
         # Draw a line between (y, x1) and (y, x2)
         cv2.line(position_image, (x1, y), (x2, y), (0, 0, 255), 1)
         cv2.line(image1, (x1, y), (x2, y), (0, 0, 255), 1)
+    if mode == "extended":
+        cv2.imshow("Position image", position_image)
 
-    cv2.imshow("Position image", position_image)
-    cv2.imshow("Image with lines", image1)
-    cv2.waitKey(0)
-
-    return match_map
+    return image1
 
 def addColor(img, color):
     # need to convert it to float32
@@ -268,34 +264,34 @@ def addColor(img, color):
 
     return colored
 
-def generateDepthFromTwoImages(img1Path, img2Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight):
+def generateDepthFromTwoImages(img1Path, img2Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight, mode="simple"):
     # Swap images 1 and 2 for visualization purposes
     img1 = initilizeImage(img2Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight)
     img2 = initilizeImage(img1Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight)
-    # Images before
-    imagesBefore = np.concatenate((img1, img2), axis=1)
-    cv2.namedWindow('Resized Image', cv2.WINDOW_NORMAL)
-    cv2.imshow("Initial images", imagesBefore)
-    cv2.waitKey(0)
+    
+    if mode == "extended":
+        # Images before
+        imagesBefore = np.concatenate((img1, img2), axis=1)
+        cv2.namedWindow('Resized Image', cv2.WINDOW_NORMAL)
+        cv2.imshow("Initial images", imagesBefore)
+        cv2.waitKey(0)
 
     # Brain process
     visualCortexV1()
     img1Edges = visualCortexV2V3(img1)
     img2Edges = visualCortexV2V3(img2)
     imagesEdges = np.concatenate((img1Edges, img2Edges), axis=1)
-    cv2.namedWindow('Resized Image', cv2.WINDOW_NORMAL)
-    cv2.imshow('Canny Edge Detection', imagesEdges)
-    cv2.waitKey(0)
-
     blended_initial = superimpose(img1, img2, 0.3)
-    cv2.imshow("Superimposed images", blended_initial)
-    cv2.waitKey(0)
-
-    match_map = convolute(img1Edges, img2Edges, KERNEL_SIZE, blended_initial)
-    cv2.imshow('Match Map', match_map)
-    # print(match_map)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    imageWithLines = convolute(img1Edges, img2Edges, KERNEL_SIZE, blended_initial)
+    if mode == "extended":
+        cv2.namedWindow('Resized Image', cv2.WINDOW_NORMAL)
+        cv2.imshow('Canny Edge Detection', imagesEdges)
+        cv2.waitKey(0)
+        cv2.imshow("Superimposed images", blended_initial)
+        cv2.waitKey(0)
+    
+    return imageWithLines
+        
 
 def generateDepthFromVideo():
     ''' Using the video from the video folder, calculate depth'''
@@ -303,8 +299,11 @@ def generateDepthFromVideo():
     timeframes = [1, 10, 17, 23, 30, 40, 47, 51, 61, 70, 76]
     # Get the frames from the video and store them in imagesFromVideo folder locally
     newImagesFilePathArray = extract_frames(VIDEO_PATH, timeframes, IMAGES_FROM_VIDEO_PATH)
-    generateDepthFromTwoImages(newImagesFilePathArray[0], newImagesFilePathArray[1], IMG_CROP_START_X,
-                               IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
+    for i in range(1, len(newImagesFilePathArray)):
+        imageWithLines = generateDepthFromTwoImages(newImagesFilePathArray[i-1], newImagesFilePathArray[i], IMG_CROP_START_X, IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
+        cv2.imshow('Image with lines', imageWithLines)
+        cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 def main():
     # generateDepthFromTwoImages(IMG1_PATH, IMG2_PATH, IMG_CROP_START_X, IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
