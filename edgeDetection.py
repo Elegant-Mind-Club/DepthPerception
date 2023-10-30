@@ -5,9 +5,11 @@ from skimage.metrics import structural_similarity as ssim
 import os
 
 # Constants
-IMG1_PATH = '10cmDownscaled.jpg'
+IMG1_PATH = 'imagesFromVideo/1_seconds.jpg'
 
-IMG2_PATH = '20cmDownscaled.jpg'
+IMG2_PATH = 'imagesFromVideo/10_seconds.jpg'
+
+IMG3_PATH = 'imagesFromVideo/17_seconds.jpg'
 
 VIDEO_PATH = 'video/testVideo.MOV'
 
@@ -174,13 +176,6 @@ def visualCortexV2V3(img):
     return edges
 
 
-def convolute(img1, img2, kernel_size, originalImage):
-    # Depth
-    return find_best_match(img1, img2, kernel_size, originalImage)
-
-# alpha: transparency value for blending for img 1
-
-
 def superimpose(img1, img2, alpha):
     # make sure both are of the same datatype
     img1 = img1.astype(np.uint8)
@@ -195,11 +190,10 @@ def superimpose(img1, img2, alpha):
     return blended
 
 
-def find_best_match(image1Edges, image2Edges, kernel_size, image1, mode="simple"):
+def find_best_match(image1Edges, image2Edges, kernel_size, image1, mode="simple", match_locations=[]):
     """Find best MSE match for each kernel position in image1 by sliding a kernel in image2."""
     height, width = image1Edges.shape
     match_map = np.zeros((height - kernel_size + 1, width - kernel_size + 1))
-    match_locations = []
 
     for y in range(0, height - kernel_size + 1, 3):
         for x1 in range(0, width - kernel_size + 1):
@@ -229,16 +223,11 @@ def find_best_match(image1Edges, image2Edges, kernel_size, image1, mode="simple"
 
     # print position map
     np.set_printoptions(threshold=np.inf)
-    match_locations.sort()
     # print(match_locations)
 
     # Generate position image. Initialize an all-black image
     position_image = np.ones((height, width), dtype=np.uint8) * 255
-    # prev = -1
     for (y, x1, x2) in match_locations:
-        # if y == prev:
-        #     continue
-        # prev = y
         position_image[y, x2] = 0  # Set (y, x2) to white
         position_image[y, x1] = 0  # Set (y, x1) to white
 
@@ -264,7 +253,7 @@ def addColor(img, color):
 
     return colored
 
-def generateDepthFromTwoImages(img1Path, img2Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight, mode="simple"):
+def generateDepthFromTwoImages(img1Path, img2Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight, mode="simple", match_locations=[]):
     # Swap images 1 and 2 for visualization purposes
     img1 = initilizeImage(img2Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight)
     img2 = initilizeImage(img1Path, imgCropStartX, imgCropStartY, imgCropWidth, imgCropHeight)
@@ -282,7 +271,7 @@ def generateDepthFromTwoImages(img1Path, img2Path, imgCropStartX, imgCropStartY,
     img2Edges = visualCortexV2V3(img2)
     imagesEdges = np.concatenate((img1Edges, img2Edges), axis=1)
     blended_initial = superimpose(img1, img2, 0.3)
-    imageWithLines = convolute(img1Edges, img2Edges, KERNEL_SIZE, blended_initial)
+    imageWithLines = find_best_match(img1Edges, img2Edges, KERNEL_SIZE, blended_initial, match_locations=match_locations)
     if mode == "extended":
         cv2.namedWindow('Resized Image', cv2.WINDOW_NORMAL)
         cv2.imshow('Canny Edge Detection', imagesEdges)
@@ -306,8 +295,46 @@ def generateDepthFromVideo():
     cv2.destroyAllWindows()
 
 def main():
-    # generateDepthFromTwoImages(IMG1_PATH, IMG2_PATH, IMG_CROP_START_X, IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT)
-    generateDepthFromVideo()
+    # Generate depth from two images
+    match_locations_1 = []
+    match_locations_2 = []
+    imageWithLines1 = generateDepthFromTwoImages(IMG1_PATH, IMG2_PATH, IMG_CROP_START_X, IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT, match_locations=match_locations_1)
+    imageWithLines2 = generateDepthFromTwoImages(IMG2_PATH, IMG3_PATH, IMG_CROP_START_X, IMG_CROP_START_Y, IMG_CROP_WIDTH, IMG_CROP_HEIGHT, match_locations=match_locations_2)
+
+    # Make new match_locations_displacement variable that stores y level and displacement
+    match_locations_1_displacement = set()
+    for match in match_locations_1:
+        match_locations_1_displacement.add((match[0], match[2] - match[1]))
+    match_locations_2_displacement = set()
+    for match in match_locations_2:
+        match_locations_2_displacement.add((match[0], match[2] - match[1]))
+    # Only keep matches that have the same displacement in the other image along the same y level
+    new_match_locations_2 = []
+    for pos, match in enumerate(match_locations_2):
+        print("\n", match_locations_2[pos])
+        if (match[0], match[2] - match[1]) not in match_locations_1_displacement:
+            match_locations_2.pop(pos)
+            # print((match[0], match[1], match[2], match[2] - match[1]))
+        else:
+            new_match_locations_2.append((match[0], match[1], match[2]))
+    # Generate image with lines for image 2
+    img2AfterCoincedence = cv2.imread(IMG2_PATH)
+    for (y, x1, x2) in new_match_locations_2:
+
+        # Draw a line between (y, x1) and (y, x2)
+        cv2.line(img2AfterCoincedence, (x1, y), (x2, y), (0, 0, 255), 1)
+    # show images to see if it worked
+
+    cv2.imshow('Image with lines1', imageWithLines1)
+    cv2.waitKey(0)
+    cv2.imshow('Image with lines2', imageWithLines2)
+    cv2.waitKey(0)
+    cv2.imshow('After checking for coincedence in image 2', img2AfterCoincedence)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    # Generate depth from video
+    # generateDepthFromVideo()
 
 if __name__ == "__main__":
     main()
